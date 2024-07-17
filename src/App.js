@@ -1,15 +1,21 @@
-// src/App.js
-import React from 'react';
+import React, { useState } from 'react';
+import axios from 'axios';
 import ConfigurationForm from './components/ConfigurationForm';
 import WebsiteCard from './components/WebsiteCard';
+import TestBackendIntegration from './components/TestBackendIntegration';
+
 
 function App() {
-  const [configurations, setConfigurations] = React.useState([]);
+  const [configurations, setConfigurations] = useState([]);
 
   const handleFormSubmit = (formData) => {
-    // Send the formData to your backend to process and generate the website
-    // For now, we'll just add it to a list to display it
-    setConfigurations([...configurations, formData]);
+    axios.post('http://127.0.0.1:8000/api/pages/', formData)
+      .then(response => {
+        setConfigurations([...configurations, response.data]);
+      })
+      .catch(error => {
+        console.error("There was an error creating the page!", error);
+      });
   };
 
   return (
@@ -20,10 +26,11 @@ function App() {
         {configurations.map((config, index) => (
           <WebsiteCard
             key={index}
-            title={config.websiteName}
+            title={config.title}
             description={config.description}
           />
         ))}
+      <TestBackendIntegration />
       </div>
     </div>
   );

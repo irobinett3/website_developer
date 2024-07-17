@@ -1,4 +1,4 @@
-#!/Users/ianrobinett/personal_website/django_back/venv/bin/python3.12
+#!/Users/ianrobinett/personal_website/myproject/website-generator/django_back/venv/bin/python3.12
 # -*- coding: utf-8 -*-
 import re
 import sys

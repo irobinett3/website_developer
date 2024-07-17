@@ -1,6 +1,5 @@
-// src/components/ConfigurationForm.js
 import React, { useState } from 'react';
-
+import { getCookie } from './utils';
 const ConfigurationForm = ({ onSubmit }) => {
   const [formData, setFormData] = useState({
     websiteName: '',
@@ -12,33 +11,29 @@ const ConfigurationForm = ({ onSubmit }) => {
       eCommerce: false,
       portfolio: false,
     },
-    pages: [{ title: '', description: '' }],
+    pages: [{ title: '', description: '', images: [] }],
   });
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
-    if (type === 'checkbox') {
-      setFormData({
-        ...formData,
-        features: {
-          ...formData.features,
-          [name]: checked,
-        },
-      });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
   };
 
   const handlePageChange = (index, e) => {
-    const { name, value } = e.target;
+    const { name, value, files } = e.target;
     const newPages = [...formData.pages];
-    newPages[index][name] = value;
+
+    if (files) {
+      newPages[index][name] = Array.from(files);
+    } else {
+      newPages[index][name] = value;
+    }
+
     setFormData({ ...formData, pages: newPages });
   };
 
   const addPage = () => {
-    setFormData({ ...formData, pages: [...formData.pages, { title: '', description: '' }] });
+    setFormData({ ...formData, pages: [...formData.pages, { title: '', description: '', images: [] }] });
   };
 
   const removePage = (index) => {
@@ -46,9 +41,81 @@ const ConfigurationForm = ({ onSubmit }) => {
     setFormData({ ...formData, pages: newPages });
   };
 
+  const handleImageChange = (pageIndex, imageIndex, e) => {
+    const files = Array.from(e.target.files);
+    const newPages = [...formData.pages];
+    newPages[pageIndex].images[imageIndex] = files[0];
+    setFormData({ ...formData, pages: newPages });
+  };
+
+  const addImageField = (pageIndex) => {
+    const newPages = [...formData.pages];
+    newPages[pageIndex].images.push('');
+    setFormData({ ...formData, pages: newPages });
+  };
+
+  const removeImageField = (pageIndex, imageIndex) => {
+    const newPages = [...formData.pages];
+    newPages[pageIndex].images = newPages[pageIndex].images.filter((_, i) => i !== imageIndex);
+    setFormData({ ...formData, pages: newPages });
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSubmit(formData);
+    const formDataObj = new FormData();
+
+    const csrftoken = getCookie('csrftoken');
+
+
+    fetch('http://localhost:8000/api/upload/', {
+      method: 'POST',
+      body: formDataObj,
+      headers: {
+        'X-CSRFToken': csrftoken,
+      },
+      credentials: 'include', // Include credentials such as cookies
+    })
+    .then(response => response.json())
+    .then(data => {
+      console.log('Success:', data);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
+
+    // Add text fields to FormData
+    formDataObj.append('websiteName', formData.websiteName);
+    formDataObj.append('description', formData.description);
+    formDataObj.append('colorScheme', formData.colorScheme);
+    formDataObj.append('layout', formData.layout);
+
+    // Add features to FormData
+    for (let key in formData.features) {
+      formDataObj.append(`features[${key}]`, formData.features[key]);
+    }
+
+    // Add pages to FormData
+    formData.pages.forEach((page, index) => {
+      formDataObj.append(`pages[${index}][title]`, page.title);
+      formDataObj.append(`pages[${index}][description]`, page.description);
+      page.images.forEach((image, imgIndex) => {
+        formDataObj.append(`pages[${index}][images][${imgIndex}]`, image);
+      });
+    });
+
+    // Send FormData to backend
+    fetch('http://localhost:8000/api/upload', {
+      method: 'POST',
+      body: formDataObj,
+    })
+    .then(response => response.json())
+    .then(data => {
+      // Handle the response data
+      console.log('Success:', data);
+    })
+    .catch(error => {
+      console.error('Error:', error);
+    });
   };
 
   return (
@@ -86,38 +153,49 @@ const ConfigurationForm = ({ onSubmit }) => {
           </label>
         </div>
       </div>
-      <div>
-        <label>Pages:</label>
-        {formData.pages.map((page, index) => (
-          <div key={index} style={styles.pageContainer}>
-            <div>
-              <label>Page Title:</label>
-              <input
-                type="text"
-                name="title"
-                value={page.title}
-                onChange={(e) => handlePageChange(index, e)}
-                required
-              />
-            </div>
-            <div>
-              <label>Page Description:</label>
-              <textarea
-                name="description"
-                value={page.description}
-                onChange={(e) => handlePageChange(index, e)}
-                required
-              />
-            </div>
-            <button type="button" onClick={() => removePage(index)} style={styles.removeButton}>
-              - Remove Page
+      {formData.pages.map((page, pageIndex) => (
+        <div key={pageIndex} style={styles.pageContainer}>
+          <div>
+            <label>Page Title:</label>
+            <input
+              type="text"
+              name="title"
+              value={page.title}
+              onChange={(e) => handlePageChange(pageIndex, e)}
+              required
+            />
+          </div>
+          <div>
+            <label>Page Description:</label>
+            <textarea
+              name="description"
+              value={page.description}
+              onChange={(e) => handlePageChange(pageIndex, e)}
+              required
+            />
+          </div>
+          <div>
+            <label>Upload Images:</label>
+            {page.images.map((image, imageIndex) => (
+              <div key={imageIndex} style={styles.imageFieldContainer}>
+                <input type="file" onChange={(e) => handleImageChange(pageIndex, imageIndex, e)} />
+                <button type="button" onClick={() => removeImageField(pageIndex, imageIndex)} style={styles.removeImageButton}>
+                  - Remove Image
+                </button>
+              </div>
+            ))}
+            <button type="button" onClick={() => addImageField(pageIndex)} style={styles.addButton}>
+              + Add Image
             </button>
           </div>
-        ))}
-        <button type="button" onClick={addPage} style={styles.addButton}>
-          + Add Page
-        </button>
-      </div>
+          <button type="button" onClick={() => removePage(pageIndex)} style={styles.removeButton}>
+            - Remove Page
+          </button>
+        </div>
+      ))}
+      <button type="button" onClick={addPage} style={styles.addButton}>
+        + Add Page
+      </button>
       <button type="submit">Generate Website</button>
     </form>
   );
@@ -138,6 +216,12 @@ const styles = {
     margin: '8px 0',
     position: 'relative',
   },
+  imageFieldContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    margin: '8px 0',
+  },
   addButton: {
     margin: '8px 0',
   },
@@ -145,6 +229,13 @@ const styles = {
     position: 'absolute',
     top: '8px',
     right: '8px',
+    backgroundColor: 'red',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+  },
+  removeImageButton: {
     backgroundColor: 'red',
     color: 'white',
     border: 'none',
